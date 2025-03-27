@@ -39,7 +39,7 @@ app = dash.Dash(__name__)
 server = app.server
 
 # Define app layout
-app.layout = html.Div(style={'backgroundColor': 'green', 'color': 'black', 'padding': '10px'}, children=[
+app.layout = html.Div(style={'backgroundColor': 'white', 'color': 'black', 'padding': '10px'}, children=[
     html.H1("Greenhouse AI & Sensor Dashboard", style={'textAlign': 'center'}),
 
     dcc.Dropdown(
@@ -102,8 +102,11 @@ def update_graph(selected_feature):
         title=f"Sensor vs AI Prediction: {SENSOR_LABELS[selected_feature]}",
         xaxis_title="Time",
         yaxis_title=SENSOR_LABELS[selected_feature],
-        template="plotly_dark",
-        yaxis=dict(range=[y_min, y_max])
+        template="plotly_white",  # Light theme
+        yaxis=dict(range=[y_min, y_max]),
+        plot_bgcolor='white',      # Chart area background
+        paper_bgcolor='white',     # Outside chart area
+        font=dict(color='black')   # Font color for visibility
     )
 
     return f"{SENSOR_LABELS[selected_feature]} - Actual vs Predicted", fig
