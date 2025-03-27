@@ -4,10 +4,11 @@ from dash.dependencies import Input, Output
 import pandas as pd
 import plotly.graph_objects as go
 import requests
+import io
 
 # ThingSpeak API configuration
-THINGSPEAK_CHANNEL_ID = "2867238"  # Your ThingSpeak channel ID
-THINGSPEAK_API_KEY = "8VBQT42DSZ7SSCV3"  # Your Read API key
+THINGSPEAK_CHANNEL_ID = "2867238"
+THINGSPEAK_API_KEY = "8VBQT42DSZ7SSCV3"
 
 # Mapping sensor names to their ThingSpeak field numbers
 THINGSPEAK_FIELDS = {
@@ -35,73 +36,68 @@ SENSOR_LABELS = {
 
 # Initialize the Dash app
 app = dash.Dash(__name__)
-server = app.server  # Expose server for deployment with Render or Gunicorn
+server = app.server
 
-# Define app layout with a title, dropdown, and graph output
+# Define app layout
 app.layout = html.Div(style={'backgroundColor': 'green', 'color': 'black', 'padding': '10px'}, children=[
     html.H1("Greenhouse AI & Sensor Dashboard", style={'textAlign': 'center'}),
 
-    # Dropdown to select a sensor
     dcc.Dropdown(
         id='sensor-dropdown',
         options=[{'label': label, 'value': key} for key, label in SENSOR_LABELS.items()],
-        value='Air_Temperature',  # Default selected sensor
+        value='Air_Temperature',
         style={'width': '50%', 'margin': 'auto'}
     ),
 
-    # Display the graph title
     html.Div(id='prediction-title', style={'textAlign': 'center'}),
 
-    # Graph element to show actual and predicted values
     dcc.Graph(id='sensor-graph', style={'height': '80vh'})
 ])
 
-# Update graph based on dropdown selection
 @app.callback(
     [Output('prediction-title', 'children'),
      Output('sensor-graph', 'figure')],
     [Input('sensor-dropdown', 'value')]
 )
 def update_graph(selected_feature):
-    # Get the ThingSpeak API URL for the selected sensor
+    # Get actual data from ThingSpeak
     actual_url = f"https://api.thingspeak.com/channels/{THINGSPEAK_CHANNEL_ID}/fields/{THINGSPEAK_FIELDS[selected_feature]}.json?api_key={THINGSPEAK_API_KEY}&results=100"
-
-    # Fetch the data from ThingSpeak
     response = requests.get(actual_url).json()
 
-    # Extract time and values, filtering out None entries
     actual_times = [entry["created_at"] for entry in response["feeds"] if entry.get(f"field{THINGSPEAK_FIELDS[selected_feature]}")]
     actual_values = [float(entry[f"field{THINGSPEAK_FIELDS[selected_feature]}"]) for entry in response["feeds"] if entry.get(f"field{THINGSPEAK_FIELDS[selected_feature]}")]
 
-    # Load predicted values from the CSV hosted on Google Drive
     try:
-        predicted_df = pd.read_csv(PREDICTED_FILES[selected_feature])
+        # Use requests to fetch the CSV from Google Drive
+        file_url = PREDICTED_FILES[selected_feature]
+        file_response = requests.get(file_url)
+        file_response.raise_for_status()
+
+        # Load CSV using pandas
+        predicted_df = pd.read_csv(io.StringIO(file_response.text))
         predicted_df['Time'] = pd.to_datetime(predicted_df['Time'])
         predicted_time = predicted_df['Time']
         predicted_values = predicted_df['Predicted Value']
     except Exception as e:
+        print(f"Failed to load predicted CSV: {e}")
         return "Error loading predicted data", {}
 
-    # Create the figure with actual and predicted traces
+    # Create graph
     fig = go.Figure()
 
-    # Add actual values (ThingSpeak)
     fig.add_trace(go.Scatter(
         x=actual_times, y=actual_values,
         mode='lines+markers', name="Actual Data", line=dict(color='blue')
     ))
 
-    # Add predicted values (Google Drive CSV)
     fig.add_trace(go.Scatter(
         x=predicted_time, y=predicted_values,
         mode='lines+markers', name="Predicted Future", line=dict(color='red', dash='dash')
     ))
 
-    # Dynamically set y-axis limits
     y_min = min(min(actual_values), min(predicted_values)) * 0.9
     y_max = max(max(actual_values), max(predicted_values)) * 1.1
 
-    # Format the graph layout
     fig.update_layout(
         title=f"Sensor vs AI Prediction: {SENSOR_LABELS[selected_feature]}",
         xaxis_title="Time",
@@ -110,9 +106,7 @@ def update_graph(selected_feature):
         yaxis=dict(range=[y_min, y_max])
     )
 
-    # Return title and graph object
     return f"{SENSOR_LABELS[selected_feature]} - Actual vs Predicted", fig
 
-# Run the app in development mode if run directly
 if __name__ == '__main__':
     app.run_server(debug=True)
