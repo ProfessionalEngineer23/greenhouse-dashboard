@@ -3,12 +3,29 @@ from dash import dcc, html
 from dash.dependencies import Input, Output
 import pandas as pd
 import plotly.graph_objects as go
-import os
+import requests
 
-# 🟢 Windows Google Drive Path (Change if needed)
-GOOGLE_DRIVE_PATH = r"G:\My Drive\Colab Notebooks\CSV_DATA"
+# ThingSpeak API configuration
+THINGSPEAK_CHANNEL_ID = "2867238"
+THINGSPEAK_API_KEY = "8VBQT42DSZ7SSCV3"
 
-# Sensor Labels for Better Readability
+# Mapping each sensor name to its corresponding ThingSpeak field number
+THINGSPEAK_FIELDS = {
+    'Soil_Temperature': 1,
+    'Air_Temperature': 2,
+    'Humidity': 3,
+    'Light_Intensity': 4
+}
+
+# Public Google Drive CSV file URLs for AI-predicted values
+PREDICTED_FILES = {
+    'Soil_Temperature': "https://drive.google.com/uc?export=download&id=1-A3_3DvK0eVOotIlZq5jyEl-lM0AWn27",
+    'Air_Temperature': "https://drive.google.com/uc?export=download&id=1-bNzPoA-2VWE1vpka4vy4vUXxI17MqPb",
+    'Humidity': "https://drive.google.com/uc?export=download&id=1-U0-uaAyyoRo4gVM-tzyFypL1nNtINKQ",
+    'Light_Intensity': "https://drive.google.com/uc?export=download&id=1-6yBJmU4Iz2wfwg_opJdKgQVu4tLEALb"
+}
+
+# Labels used for display on the dashboard
 SENSOR_LABELS = {
     'Soil_Temperature': "Soil Temperature (°C)",
     'Air_Temperature': "Air Temperature (°C)",
@@ -16,79 +33,82 @@ SENSOR_LABELS = {
     'Light_Intensity': "Light Intensity (lux)"
 }
 
-# Initialize Dash App
+# Initialize the Dash application
 app = dash.Dash(__name__)
+server = app.server  # Expose the server object for deployment (e.g., with gunicorn)
 
-app.layout = html.Div(style={'backgroundColor': 'green', 'color': 'Black', 'padding': '10px'}, children=[
-    html.H1("Greenhouse AI Predictions Dashboard", style={'textAlign': 'center'}),
+# Define the layout of the dashboard
+app.layout = html.Div(style={'backgroundColor': 'green', 'color': 'black', 'padding': '10px'}, children=[
+    html.H1("Greenhouse AI & Sensor Dashboard", style={'textAlign': 'center'}),
 
+    # Dropdown menu to select sensor type
     dcc.Dropdown(
         id='sensor-dropdown',
         options=[{'label': label, 'value': key} for key, label in SENSOR_LABELS.items()],
-        value='Air_Temperature',  # Default sensor selection
+        value='Air_Temperature',  # Default selection
         style={'width': '50%', 'margin': 'auto'}
     ),
 
+    # Title and graph output
     html.Div(id='prediction-title', style={'textAlign': 'center'}),
-
-    dcc.Graph(id='prediction-graph', style={'height': '80vh'})
+    dcc.Graph(id='sensor-graph', style={'height': '80vh'})
 ])
 
+# Define callback to update the graph when a sensor is selected
 @app.callback(
     [Output('prediction-title', 'children'),
-     Output('prediction-graph', 'figure')],
+     Output('sensor-graph', 'figure')],
     [Input('sensor-dropdown', 'value')]
 )
 def update_graph(selected_feature):
-    """Load actual & predicted CSV data from Google Drive and update graph."""
+    # Fetch actual sensor data from ThingSpeak using API
+    actual_url = f"https://api.thingspeak.com/channels/{THINGSPEAK_CHANNEL_ID}/fields/{THINGSPEAK_FIELDS[selected_feature]}.json?api_key={THINGSPEAK_API_KEY}&results=100"
+    response = requests.get(actual_url).json()
 
-    actual_file = os.path.join(GOOGLE_DRIVE_PATH, "Actual_Sensor_Data.csv")  # 🔹 Actual data file
-    predicted_file = os.path.join(GOOGLE_DRIVE_PATH, f"Predicted_{selected_feature}.csv")  # 🔹 AI Predictions
+    # Parse actual data timestamps and values
+    actual_times = [entry["created_at"] for entry in response["feeds"] if entry[f"field{THINGSPEAK_FIELDS[selected_feature]}"]]
+    actual_values = [float(entry[f"field{THINGSPEAK_FIELDS[selected_feature]}"]) for entry in response["feeds"] if entry[f"field{THINGSPEAK_FIELDS[selected_feature]}"]]
 
-    if os.path.exists(actual_file) and os.path.exists(predicted_file):
-        # Load actual sensor data
-        actual_df = pd.read_csv(actual_file)
-        actual_df['Time'] = pd.to_datetime(actual_df['Time'])  # Convert time to datetime
+    # Load predicted data from Google Drive CSV
+    try:
+        predicted_df = pd.read_csv(PREDICTED_FILES[selected_feature])
+        predicted_df['Time'] = pd.to_datetime(predicted_df['Time'])
+        predicted_time = predicted_df['Time']
+        predicted_values = predicted_df['Predicted Value']
+    except Exception as e:
+        return "Error loading predicted data", {}
 
-        # Load AI prediction data
-        predicted_df = pd.read_csv(predicted_file)
-        predicted_df['Time'] = pd.to_datetime(predicted_df['Time'])  # Convert time to datetime
+    # Create graph
+    fig = go.Figure()
 
-        # Define sensor label
-        y_axis_label = SENSOR_LABELS[selected_feature]
+    # Add actual data trace (blue)
+    fig.add_trace(go.Scatter(
+        x=actual_times, y=actual_values,
+        mode='lines+markers', name="Actual Data", line=dict(color='blue')
+    ))
 
-        # Create graph with actual and predicted values
-        fig = go.Figure()
+    # Add predicted data trace (red dashed line)
+    fig.add_trace(go.Scatter(
+        x=predicted_time, y=predicted_values,
+        mode='lines+markers', name="Predicted Future", line=dict(color='red', dash='dash')
+    ))
 
-        # Plot actual sensor data
-        fig.add_trace(go.Scatter(
-            x=actual_df['Time'], y=actual_df[selected_feature],
-            mode='lines+markers', name="Actual Data", line=dict(color='blue')
-        ))
+    # Set Y-axis range with padding
+    y_min = min(min(actual_values), min(predicted_values)) * 0.9
+    y_max = max(max(actual_values), max(predicted_values)) * 1.1
 
-        # Plot AI predicted data (future)
-        fig.add_trace(go.Scatter(
-            x=predicted_df['Time'], y=predicted_df['Predicted Value'],
-            mode='lines+markers', name="Predicted Future", line=dict(color='red', dash='dash')
-        ))
+    # Final layout formatting
+    fig.update_layout(
+        title=f"Sensor vs AI Prediction: {SENSOR_LABELS[selected_feature]}",
+        xaxis_title="Time",
+        yaxis_title=SENSOR_LABELS[selected_feature],
+        template="plotly_dark",
+        yaxis=dict(range=[y_min, y_max])
+    )
 
-        # Ensure proper Y-axis scaling
-        y_min = min(actual_df[selected_feature].min(), predicted_df["Predicted Value"].min()) * 0.9
-        y_max = max(actual_df[selected_feature].max(), predicted_df["Predicted Value"].max()) * 1.1
+    # Return title and figure
+    return f"{SENSOR_LABELS[selected_feature]} - Actual vs Predicted", fig
 
-        # Formatting
-        fig.update_layout(
-            title=f"AI Prediction for {selected_feature}",
-            xaxis_title="Time",
-            yaxis_title=y_axis_label,
-            template="plotly_dark",
-            yaxis=dict(range=[y_min, y_max])
-        )
-
-        return f"Predictions for {selected_feature}", fig
-
-    else:
-        return f"No Data Available for {selected_feature}", {}
-
+# Run app locally if script is executed directly
 if __name__ == '__main__':
-    app.run_server(debug=True, port=8050)
+    app.run_server(debug=True)
