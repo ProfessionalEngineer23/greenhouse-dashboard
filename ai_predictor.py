@@ -9,6 +9,7 @@ import time
 import schedule
 import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
+from sklearn.preprocessing import PolynomialFeatures
 from datetime import datetime
 from google.colab import drive
 import requests
@@ -63,19 +64,29 @@ def load_master_data():
         print(f"❌ Error loading master data: {e}")
         return None
 
-def train_and_predict(df, feature):
-    """Train a model and predict future values"""
+def train_and_predict(df, feature, degree=3):
+    """
+    Train a polynomial regression model and predict future values.
+    This function uses polynomial regression to better capture nonlinear trends in the data.
+    """
     cleaned = df.dropna(subset=[feature])
-    if len(cleaned) < 2:
-        print(f"⚠️ Not enough valid data to train for {feature}")
+    if len(cleaned) < degree + 1:
+        print(f"⚠️ Not enough valid data to train for {feature} with degree {degree}")
         return None
 
     X = cleaned[['time_seconds']].values
     y = cleaned[feature].values
-    model = LinearRegression().fit(X, y)
+
+    # Transform the original feature into polynomial features up to the given degree
+    poly = PolynomialFeatures(degree=degree)
+    X_poly = poly.fit_transform(X)
+
+    # Train a linear model on the polynomial-transformed data (polynomial regression)
+    model = LinearRegression().fit(X_poly, y)
 
     future_times = np.array([(cleaned['time_seconds'].max() + i * 60) for i in range(1, 6)]).reshape(-1, 1)
-    predictions = model.predict(future_times)
+    future_poly = poly.transform(future_times)
+    predictions = model.predict(future_poly)
 
     return pd.DataFrame({
         'Time': [cleaned.index.max() + pd.Timedelta(minutes=i) for i in range(1, 6)],
@@ -130,7 +141,7 @@ def run_ai_update():
 
     for feature in ['Soil_Temperature', 'Air_Temperature', 'Humidity', 'Light_Intensity']:
         if feature in df.columns:
-            predictions = train_and_predict(df, feature)
+            predictions = train_and_predict(df, feature, degree=3)
             save_predictions(predictions, feature)
             save_graph(feature, df, predictions)
 
@@ -141,7 +152,7 @@ print("📅 AI auto-update is scheduled every 5 minutes.")
 # Run once immediately to test
 run_ai_update()
 
-# Continuous loop (uncomment if needed)
+# Continuous loop
 while True:
      schedule.run_pending()
      time.sleep(1)
