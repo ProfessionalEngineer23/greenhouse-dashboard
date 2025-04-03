@@ -57,7 +57,7 @@ def fetch_predicted_data(selected_feature):
 
 # Initialize the Dash app
 app = dash.Dash(__name__)
-server = app.server  # Required for Render deployment (Gunicorn looks for 'server')
+server = app.server  # Required for Render deployment
 
 # Define app layout
 app.layout = html.Div(style={'backgroundColor': 'white', 'color': 'black', 'padding': '10px'}, children=[
@@ -74,7 +74,7 @@ app.layout = html.Div(style={'backgroundColor': 'white', 'color': 'black', 'padd
 
     dcc.Interval(
         id='interval-component',
-        interval=60*1000,  # Update every 1 minute
+        interval=60*1000,  # 1 minute
         n_intervals=0
     ),
 
@@ -123,6 +123,6 @@ def update_graph(selected_feature, n):
 
     return f"{SENSOR_LABELS[selected_feature]} - Actual vs Predicted", fig
 
-# Only used when running locally (Render uses gunicorn)
+# Run locally or with gunicorn in deployment
 if __name__ == '__main__':
     app.run_server(debug=False, host='0.0.0.0', port=10000)
