@@ -5,8 +5,6 @@ import pandas as pd
 import plotly.graph_objects as go
 import requests
 import io
-import time
-from threading import Thread
 
 # ThingSpeak API configuration
 THINGSPEAK_CHANNEL_ID = "2867238"
@@ -95,7 +93,7 @@ def update_graph(selected_feature, n):
     actual_times, actual_values = fetch_actual_data(selected_feature)
     predicted_time, predicted_values = fetch_predicted_data(selected_feature)
 
-    if not actual_times or not predicted_time.any():
+    if not actual_times or len(predicted_time) == 0:
         return "Error loading data", {}
 
     fig = go.Figure()
@@ -127,4 +125,4 @@ def update_graph(selected_feature, n):
     return f"{SENSOR_LABELS[selected_feature]} - Actual vs Predicted", fig
 
 if __name__ == '__main__':
-    app.run_server(debug=True, host='0.0.0.0', port=10000)
+    app.run_server(debug=False, host='0.0.0.0', port=10000)
