@@ -1,10 +1,65 @@
+import dash
+from dash import dcc, html
+from dash.dependencies import Input, Output
+import pandas as pd
+import plotly.graph_objects as go
+import requests
+import io
+
+# ThingSpeak API configuration
+THINGSPEAK_CHANNEL_ID = "2867238"
+THINGSPEAK_API_KEY = "8VBQT42DSZ7SSCV3"
+
+# Mapping sensor names to their ThingSpeak field numbers
+THINGSPEAK_FIELDS = {
+    'Soil_Temperature': 1,
+    'Air_Temperature': 2,
+    'Humidity': 3,
+    'Light_Intensity': 4
+}
+
+# Public Google Drive links to CSV files for AI-predicted data
+PREDICTED_FILES = {
+    'Soil_Temperature': "https://drive.google.com/uc?export=download&id=1-A3_3DvK0eVOotIlZq5jyEl-lM0AWn27",
+    'Air_Temperature': "https://drive.google.com/uc?export=download&id=1-bNzPoA-2VWE1vpka4vy4vUXxI17MqPb",
+    'Humidity': "https://drive.google.com/uc?export=download&id=1-U0-uaAyyoRo4gVM-tzyFypL1nNtINKQ",
+    'Light_Intensity': "https://drive.google.com/uc?export=download&id=1-6yBJmU4Iz2wfwg_opJdKgQVu4tLEALb"
+}
+
+# Display labels for each sensor
+SENSOR_LABELS = {
+    'Soil_Temperature': "Soil Temperature (°C)",
+    'Air_Temperature': "Air Temperature (°C)",
+    'Humidity': "Humidity (%)",
+    'Light_Intensity': "Light Intensity (lux)"
+}
+
+# Initialize Dash app and server
+app = dash.Dash(__name__)
+server = app.server
+
+# Layout
+app.layout = html.Div(style={'backgroundColor': 'white', 'color': 'black', 'padding': '10px'}, children=[
+    html.H1("Greenhouse AI & Sensor Dashboard", style={'textAlign': 'center'}),
+
+    dcc.Dropdown(
+        id='sensor-dropdown',
+        options=[{'label': label, 'value': key} for key, label in SENSOR_LABELS.items()],
+        value='Air_Temperature',
+        style={'width': '50%', 'margin': 'auto'}
+    ),
+
+    html.Div(id='prediction-title', style={'textAlign': 'center'}),
+    dcc.Graph(id='sensor-graph', style={'height': '80vh'})
+])
+
+# CALLBACK SHOULD GO BELOW THIS LINE!
 @app.callback(
     [Output('prediction-title', 'children'),
      Output('sensor-graph', 'figure')],
     [Input('sensor-dropdown', 'value')]
 )
 def update_graph(selected_feature):
-    # Get actual data from ThingSpeak
     actual_url = f"https://api.thingspeak.com/channels/{THINGSPEAK_CHANNEL_ID}/fields/{THINGSPEAK_FIELDS[selected_feature]}.json?api_key={THINGSPEAK_API_KEY}&results=100"
     response = requests.get(actual_url).json()
 
@@ -12,7 +67,6 @@ def update_graph(selected_feature):
     actual_values = [float(entry[f"field{THINGSPEAK_FIELDS[selected_feature]}"]) for entry in response["feeds"] if entry.get(f"field{THINGSPEAK_FIELDS[selected_feature]}")]
 
     try:
-        # Load predictions from Google Drive CSV
         file_url = PREDICTED_FILES[selected_feature]
         file_response = requests.get(file_url)
         file_response.raise_for_status()
@@ -22,7 +76,6 @@ def update_graph(selected_feature):
         predicted_times = predicted_df['Time'].tolist()
         predicted_values = predicted_df['Predicted Value'].tolist()
 
-        # Add last actual point to predicted line for smooth connection
         if actual_times and actual_values:
             predicted_times.insert(0, pd.to_datetime(actual_times[-1]))
             predicted_values.insert(0, actual_values[-1])
@@ -30,10 +83,8 @@ def update_graph(selected_feature):
         print(f"❌ Error loading predicted CSV: {e}")
         return "Error loading predicted data", {}
 
-    # Create the plot
     fig = go.Figure()
 
-    # Actual Data
     fig.add_trace(go.Scatter(
         x=actual_times,
         y=actual_values,
@@ -43,7 +94,6 @@ def update_graph(selected_feature):
         hovertemplate='Time: %{x}<br>Value: %{y}<br><b>Type: Actual</b><extra></extra>'
     ))
 
-    # Predicted Data
     fig.add_trace(go.Scatter(
         x=predicted_times,
         y=predicted_values,
@@ -53,7 +103,6 @@ def update_graph(selected_feature):
         hovertemplate='Time: %{x}<br>Value: %{y}<br><b>Type: Predicted</b><extra></extra>'
     ))
 
-    # Vertical divider
     if actual_times:
         divider_time = pd.to_datetime(actual_times[-1])
         fig.add_shape(
@@ -65,7 +114,6 @@ def update_graph(selected_feature):
             line=dict(color="gray", dash="dot", width=1)
         )
 
-    # Layout
     fig.update_layout(
         title=f"Sensor vs AI Prediction: {SENSOR_LABELS[selected_feature]}",
         xaxis_title="Time",
@@ -81,3 +129,7 @@ def update_graph(selected_feature):
     )
 
     return f"{SENSOR_LABELS[selected_feature]} - Actual vs Predicted", fig
+
+# Entry point
+if __name__ == '__main__':
+    app.run_server(debug=True, host='0.0.0.0', port=10000)
