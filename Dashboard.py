@@ -26,7 +26,6 @@ PREDICTED_FILES = {
     'Light_Intensity': "https://drive.google.com/uc?export=download&id=1-6yBJmU4Iz2wfwg_opJdKgQVu4tLEALb"
 }
 
-# Display labels for each sensor
 SENSOR_LABELS = {
     'Soil_Temperature': "Soil Temperature (°C)",
     'Air_Temperature': "Air Temperature (°C)",
@@ -34,11 +33,9 @@ SENSOR_LABELS = {
     'Light_Intensity': "Light Intensity (lux)"
 }
 
-# Initialize the Dash app
 app = dash.Dash(__name__)
 server = app.server
 
-# Define app layout
 app.layout = html.Div(style={'backgroundColor': 'white', 'color': 'black', 'padding': '10px'}, children=[
     html.H1("Greenhouse AI & Sensor Dashboard", style={'textAlign': 'center'}),
 
@@ -50,7 +47,6 @@ app.layout = html.Div(style={'backgroundColor': 'white', 'color': 'black', 'padd
     ),
 
     html.Div(id='prediction-title', style={'textAlign': 'center'}),
-
     dcc.Graph(id='sensor-graph', style={'height': '80vh'})
 ])
 
@@ -60,7 +56,6 @@ app.layout = html.Div(style={'backgroundColor': 'white', 'color': 'black', 'padd
     [Input('sensor-dropdown', 'value')]
 )
 def update_graph(selected_feature):
-    # Get actual data from ThingSpeak
     actual_url = f"https://api.thingspeak.com/channels/{THINGSPEAK_CHANNEL_ID}/fields/{THINGSPEAK_FIELDS[selected_feature]}.json?api_key={THINGSPEAK_API_KEY}&results=100"
     response = requests.get(actual_url).json()
 
@@ -68,21 +63,23 @@ def update_graph(selected_feature):
     actual_values = [float(entry[f"field{THINGSPEAK_FIELDS[selected_feature]}"]) for entry in response["feeds"] if entry.get(f"field{THINGSPEAK_FIELDS[selected_feature]}")]
 
     try:
-        # Use requests to fetch the CSV from Google Drive
         file_url = PREDICTED_FILES[selected_feature]
         file_response = requests.get(file_url)
         file_response.raise_for_status()
 
-        # Load CSV using pandas
         predicted_df = pd.read_csv(io.StringIO(file_response.text))
         predicted_df['Time'] = pd.to_datetime(predicted_df['Time'])
+
+        # Remove timezone info to align with ThingSpeak timestamps
+        if predicted_df['Time'].dt.tz is not None:
+            predicted_df['Time'] = predicted_df['Time'].dt.tz_localize(None)
+
         predicted_time = predicted_df['Time']
         predicted_values = predicted_df['Predicted Value']
     except Exception as e:
         print(f"Failed to load predicted CSV: {e}")
         return "Error loading predicted data", {}
 
-    # Create graph
     fig = go.Figure()
 
     fig.add_trace(go.Scatter(
@@ -102,11 +99,11 @@ def update_graph(selected_feature):
         title=f"Sensor vs AI Prediction: {SENSOR_LABELS[selected_feature]}",
         xaxis_title="Time",
         yaxis_title=SENSOR_LABELS[selected_feature],
-        template="plotly_white",  # Light theme
+        template="plotly_white",
         yaxis=dict(range=[y_min, y_max]),
-        plot_bgcolor='white',      # Chart area background
-        paper_bgcolor='white',     # Outside chart area
-        font=dict(color='black')   # Font color for visibility
+        plot_bgcolor='white',
+        paper_bgcolor='white',
+        font=dict(color='black')
     )
 
     return f"{SENSOR_LABELS[selected_feature]} - Actual vs Predicted", fig
