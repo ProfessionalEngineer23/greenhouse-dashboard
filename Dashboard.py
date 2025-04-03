@@ -38,22 +38,32 @@ server = app.server
 
 app.layout = html.Div(style={'backgroundColor': 'white', 'color': 'black', 'padding': '10px'}, children=[
     html.H1("Greenhouse AI & Sensor Dashboard", style={'textAlign': 'center'}),
+
     dcc.Dropdown(
         id='sensor-dropdown',
         options=[{'label': label, 'value': key} for key, label in SENSOR_LABELS.items()],
         value='Air_Temperature',
         style={'width': '50%', 'margin': 'auto'}
     ),
+
     html.Div(id='prediction-title', style={'textAlign': 'center'}),
-    dcc.Graph(id='sensor-graph', style={'height': '80vh'})
+    dcc.Graph(id='sensor-graph', style={'height': '80vh'}),
+
+    # 👇 Auto-refresh every 60 seconds
+    dcc.Interval(
+        id='interval-component',
+        interval=60 * 1000,  # in milliseconds
+        n_intervals=0
+    )
 ])
 
 @app.callback(
     [Output('prediction-title', 'children'),
      Output('sensor-graph', 'figure')],
-    [Input('sensor-dropdown', 'value')]
+    [Input('sensor-dropdown', 'value'),
+     Input('interval-component', 'n_intervals')]  # 👈 triggers every 60 seconds
 )
-def update_graph(selected_feature):
+def update_graph(selected_feature, n_intervals):
     actual_url = f"https://api.thingspeak.com/channels/{THINGSPEAK_CHANNEL_ID}/fields/{THINGSPEAK_FIELDS[selected_feature]}.json?api_key={THINGSPEAK_API_KEY}&results=100"
     response = requests.get(actual_url).json()
 
@@ -70,7 +80,6 @@ def update_graph(selected_feature):
         predicted_times = predicted_df['Time'].tolist()
         predicted_values = predicted_df['Predicted Value'].tolist()
 
-        # Smooth connection from actual to predicted
         if actual_times and actual_values:
             predicted_times.insert(0, pd.to_datetime(actual_times[-1]))
             predicted_values.insert(0, actual_values[-1])
