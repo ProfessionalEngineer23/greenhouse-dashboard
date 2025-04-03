@@ -44,8 +44,8 @@ def fetch_actual_data(selected_feature):
     actual_times = pd.to_datetime(actual_times)
     return actual_times, actual_values
 
-# Fetch predicted data from public Google Drive CSV
-def fetch_predicted_data(selected_feature):
+# Fetch predicted data from public Google Drive CSV (filtered by latest actual time)
+def fetch_predicted_data(selected_feature, latest_actual_time):
     try:
         file_url = PREDICTED_FILES[selected_feature]
         file_response = requests.get(file_url)
@@ -53,10 +53,9 @@ def fetch_predicted_data(selected_feature):
         predicted_df = pd.read_csv(io.StringIO(file_response.text))
         predicted_df['Time'] = pd.to_datetime(predicted_df['Time'])
 
-        # Match UTC format used in actual data
-        predicted_df = predicted_df[predicted_df['Time'] > datetime.utcnow() - timedelta(hours=3)]
+        future_df = predicted_df[predicted_df['Time'] > latest_actual_time]
 
-        return predicted_df['Time'], predicted_df['Predicted Value']
+        return future_df['Time'], future_df['Predicted Value']
     except Exception as e:
         print(f"Failed to load predicted CSV: {e}")
         return [], []
@@ -96,7 +95,8 @@ app.layout = html.Div(style={'backgroundColor': 'white', 'color': 'black', 'padd
 )
 def update_graph(selected_feature, n):
     actual_times, actual_values = fetch_actual_data(selected_feature)
-    predicted_time, predicted_values = fetch_predicted_data(selected_feature)
+    latest_actual_time = actual_times[-1] if len(actual_times) > 0 else datetime.utcnow()
+    predicted_time, predicted_values = fetch_predicted_data(selected_feature, latest_actual_time)
 
     if len(actual_times) == 0 or len(predicted_time) == 0:
         return "Error loading data", {}
