@@ -6,11 +6,9 @@ import plotly.graph_objects as go
 import requests
 import io
 
-# ThingSpeak API configuration
+# ThingSpeak config
 THINGSPEAK_CHANNEL_ID = "2867238"
 THINGSPEAK_API_KEY = "8VBQT42DSZ7SSCV3"
-
-# Mapping sensor names to their ThingSpeak field numbers
 THINGSPEAK_FIELDS = {
     'Soil_Temperature': 1,
     'Air_Temperature': 2,
@@ -18,7 +16,7 @@ THINGSPEAK_FIELDS = {
     'Light_Intensity': 4
 }
 
-# Public Google Drive links to CSV files for AI-predicted data
+# Google Drive CSV links
 PREDICTED_FILES = {
     'Soil_Temperature': "https://drive.google.com/uc?export=download&id=1-A3_3DvK0eVOotIlZq5jyEl-lM0AWn27",
     'Air_Temperature': "https://drive.google.com/uc?export=download&id=1-bNzPoA-2VWE1vpka4vy4vUXxI17MqPb",
@@ -33,6 +31,7 @@ SENSOR_LABELS = {
     'Light_Intensity': "Light Intensity (lux)"
 }
 
+# Dash app setup
 app = dash.Dash(__name__)
 server = app.server
 
@@ -56,30 +55,26 @@ app.layout = html.Div(style={'backgroundColor': 'white', 'color': 'black', 'padd
     [Input('sensor-dropdown', 'value')]
 )
 def update_graph(selected_feature):
-    actual_url = f"https://api.thingspeak.com/channels/{THINGSPEAK_CHANNEL_ID}/fields/{THINGSPEAK_FIELDS[selected_feature]}.json?api_key={THINGSPEAK_API_KEY}&results=100"
-    response = requests.get(actual_url).json()
-
+    # Get actual data from ThingSpeak
+    url = f"https://api.thingspeak.com/channels/{THINGSPEAK_CHANNEL_ID}/fields/{THINGSPEAK_FIELDS[selected_feature]}.json?api_key={THINGSPEAK_API_KEY}&results=100"
+    response = requests.get(url).json()
     actual_times = [entry["created_at"] for entry in response["feeds"] if entry.get(f"field{THINGSPEAK_FIELDS[selected_feature]}")]
     actual_values = [float(entry[f"field{THINGSPEAK_FIELDS[selected_feature]}"]) for entry in response["feeds"] if entry.get(f"field{THINGSPEAK_FIELDS[selected_feature]}")]
 
+    # Predicted CSV from Google Drive
     try:
         file_url = PREDICTED_FILES[selected_feature]
         file_response = requests.get(file_url)
         file_response.raise_for_status()
-
         predicted_df = pd.read_csv(io.StringIO(file_response.text))
-        predicted_df['Time'] = pd.to_datetime(predicted_df['Time'])
-
-        # Remove timezone info to align with ThingSpeak timestamps
-        if predicted_df['Time'].dt.tz is not None:
-            predicted_df['Time'] = predicted_df['Time'].dt.tz_localize(None)
-
+        predicted_df['Time'] = pd.to_datetime(predicted_df['Time'], utc=True).dt.tz_convert('Europe/Dublin').dt.tz_localize(None)
         predicted_time = predicted_df['Time']
         predicted_values = predicted_df['Predicted Value']
     except Exception as e:
-        print(f"Failed to load predicted CSV: {e}")
+        print(f"❌ Failed to load predicted CSV: {e}")
         return "Error loading predicted data", {}
 
+    # Plot
     fig = go.Figure()
 
     fig.add_trace(go.Scatter(
