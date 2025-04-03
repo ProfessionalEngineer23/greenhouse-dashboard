@@ -5,6 +5,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import requests
 import io
+from datetime import datetime, timedelta
 
 # ThingSpeak API configuration
 THINGSPEAK_CHANNEL_ID = "2867238"
@@ -20,10 +21,10 @@ THINGSPEAK_FIELDS = {
 
 # Public Google Drive links to CSV files for AI-predicted data
 PREDICTED_FILES = {
-    'Soil_Temperature': "https://drive.google.com/uc?export=download&id=1-A3_3DvK0eVOotIlZq5jyEl-lM0AWn27",
+    'Soil_Temperature': "https://drive.google.com/uc?export=download&id=1ftGCeMkhkb4-Rcvj8tsoXAq254kNDUoM",
     'Air_Temperature': "https://drive.google.com/uc?export=download&id=1-bNzPoA-2VWE1vpka4vy4vUXxI17MqPb",
     'Humidity': "https://drive.google.com/uc?export=download&id=1-U0-uaAyyoRo4gVM-tzyFypL1nNtINKQ",
-    'Light_Intensity': "https://drive.google.com/uc?export=download&id=1-6yBJmU4Iz2wfwg_opJdKgQVu4tLEALb"
+    'Light_Intensity': "https://drive.google.com/uc?export=download&id=1-A3_3DvK0eVOotIlZq5jyEl-lM0AWn27"
 }
 
 # Display labels for each sensor
@@ -34,9 +35,35 @@ SENSOR_LABELS = {
     'Light_Intensity': "Light Intensity (lux)"
 }
 
+# Fetch actual sensor data from ThingSpeak
+def fetch_actual_data(selected_feature):
+    url = f"https://api.thingspeak.com/channels/{THINGSPEAK_CHANNEL_ID}/fields/{THINGSPEAK_FIELDS[selected_feature]}.json?api_key={THINGSPEAK_API_KEY}&results=100"
+    response = requests.get(url).json()
+    actual_times = [entry["created_at"] for entry in response["feeds"] if entry.get(f"field{THINGSPEAK_FIELDS[selected_feature]}")]
+    actual_values = [float(entry[f"field{THINGSPEAK_FIELDS[selected_feature]}"]) for entry in response["feeds"] if entry.get(f"field{THINGSPEAK_FIELDS[selected_feature]}")]
+    actual_times = pd.to_datetime(actual_times)
+    return actual_times, actual_values
+
+# Fetch predicted data from public Google Drive CSV
+def fetch_predicted_data(selected_feature):
+    try:
+        file_url = PREDICTED_FILES[selected_feature]
+        file_response = requests.get(file_url)
+        file_response.raise_for_status()
+        predicted_df = pd.read_csv(io.StringIO(file_response.text))
+        predicted_df['Time'] = pd.to_datetime(predicted_df['Time'])
+
+        # Match UTC format used in actual data
+        predicted_df = predicted_df[predicted_df['Time'] > datetime.utcnow() - timedelta(hours=3)]
+
+        return predicted_df['Time'], predicted_df['Predicted Value']
+    except Exception as e:
+        print(f"Failed to load predicted CSV: {e}")
+        return [], []
+
 # Initialize the Dash app
 app = dash.Dash(__name__)
-server = app.server
+server = app.server  # Required for Render deployment
 
 # Define app layout
 app.layout = html.Div(style={'backgroundColor': 'white', 'color': 'black', 'padding': '10px'}, children=[
@@ -51,38 +78,29 @@ app.layout = html.Div(style={'backgroundColor': 'white', 'color': 'black', 'padd
 
     html.Div(id='prediction-title', style={'textAlign': 'center'}),
 
+    dcc.Interval(
+        id='interval-component',
+        interval=60*1000,  # 1 minute
+        n_intervals=0
+    ),
+
     dcc.Graph(id='sensor-graph', style={'height': '80vh'})
 ])
 
+# Graph update logic
 @app.callback(
     [Output('prediction-title', 'children'),
      Output('sensor-graph', 'figure')],
-    [Input('sensor-dropdown', 'value')]
+    [Input('sensor-dropdown', 'value'),
+     Input('interval-component', 'n_intervals')]
 )
-def update_graph(selected_feature):
-    # Get actual data from ThingSpeak
-    actual_url = f"https://api.thingspeak.com/channels/{THINGSPEAK_CHANNEL_ID}/fields/{THINGSPEAK_FIELDS[selected_feature]}.json?api_key={THINGSPEAK_API_KEY}&results=100"
-    response = requests.get(actual_url).json()
+def update_graph(selected_feature, n):
+    actual_times, actual_values = fetch_actual_data(selected_feature)
+    predicted_time, predicted_values = fetch_predicted_data(selected_feature)
 
-    actual_times = [entry["created_at"] for entry in response["feeds"] if entry.get(f"field{THINGSPEAK_FIELDS[selected_feature]}")]
-    actual_values = [float(entry[f"field{THINGSPEAK_FIELDS[selected_feature]}"]) for entry in response["feeds"] if entry.get(f"field{THINGSPEAK_FIELDS[selected_feature]}")]
+    if len(actual_times) == 0 or len(predicted_time) == 0:
+        return "Error loading data", {}
 
-    try:
-        # Use requests to fetch the CSV from Google Drive
-        file_url = PREDICTED_FILES[selected_feature]
-        file_response = requests.get(file_url)
-        file_response.raise_for_status()
-
-        # Load CSV using pandas
-        predicted_df = pd.read_csv(io.StringIO(file_response.text))
-        predicted_df['Time'] = pd.to_datetime(predicted_df['Time'])
-        predicted_time = predicted_df['Time']
-        predicted_values = predicted_df['Predicted Value']
-    except Exception as e:
-        print(f"Failed to load predicted CSV: {e}")
-        return "Error loading predicted data", {}
-
-    # Create graph
     fig = go.Figure()
 
     fig.add_trace(go.Scatter(
@@ -102,14 +120,15 @@ def update_graph(selected_feature):
         title=f"Sensor vs AI Prediction: {SENSOR_LABELS[selected_feature]}",
         xaxis_title="Time",
         yaxis_title=SENSOR_LABELS[selected_feature],
-        template="plotly_white",  # Light theme
+        template="plotly_white",
         yaxis=dict(range=[y_min, y_max]),
-        plot_bgcolor='white',      # Chart area background
-        paper_bgcolor='white',     # Outside chart area
-        font=dict(color='black')   # Font color for visibility
+        plot_bgcolor='white',
+        paper_bgcolor='white',
+        font=dict(color='black')
     )
 
     return f"{SENSOR_LABELS[selected_feature]} - Actual vs Predicted", fig
 
+# Run locally or with gunicorn in deployment
 if __name__ == '__main__':
-    app.run_server(debug=True)
+    app.run_server(debug=False, host='0.0.0.0', port=10000)
