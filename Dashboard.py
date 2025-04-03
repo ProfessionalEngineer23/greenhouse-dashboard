@@ -5,10 +5,13 @@ import pandas as pd
 import plotly.graph_objects as go
 import requests
 import io
+import time
+from threading import Thread
 
 # ThingSpeak API configuration
 THINGSPEAK_CHANNEL_ID = "2867238"
 THINGSPEAK_API_KEY = "8VBQT42DSZ7SSCV3"
+THINGSPEAK_UPDATE_URL = "https://api.thingspeak.com/update?api_key=R1ZTW11SA2559MEB&field1=0"
 
 # Mapping sensor names to their ThingSpeak field numbers
 THINGSPEAK_FIELDS = {
@@ -34,6 +37,28 @@ SENSOR_LABELS = {
     'Light_Intensity': "Light Intensity (lux)"
 }
 
+# Cache actual sensor values to check for new updates
+last_actual_data = {}
+
+def fetch_actual_data(selected_feature):
+    url = f"https://api.thingspeak.com/channels/{THINGSPEAK_CHANNEL_ID}/fields/{THINGSPEAK_FIELDS[selected_feature]}.json?api_key={THINGSPEAK_API_KEY}&results=100"
+    response = requests.get(url).json()
+    actual_times = [entry["created_at"] for entry in response["feeds"] if entry.get(f"field{THINGSPEAK_FIELDS[selected_feature]}")]
+    actual_values = [float(entry[f"field{THINGSPEAK_FIELDS[selected_feature]}"]) for entry in response["feeds"] if entry.get(f"field{THINGSPEAK_FIELDS[selected_feature]}")]
+    return actual_times, actual_values
+
+def fetch_predicted_data(selected_feature):
+    try:
+        file_url = PREDICTED_FILES[selected_feature]
+        file_response = requests.get(file_url)
+        file_response.raise_for_status()
+        predicted_df = pd.read_csv(io.StringIO(file_response.text))
+        predicted_df['Time'] = pd.to_datetime(predicted_df['Time'])
+        return predicted_df['Time'], predicted_df['Predicted Value']
+    except Exception as e:
+        print(f"Failed to load predicted CSV: {e}")
+        return [], []
+
 # Initialize the Dash app
 app = dash.Dash(__name__)
 server = app.server
@@ -51,38 +76,28 @@ app.layout = html.Div(style={'backgroundColor': 'white', 'color': 'black', 'padd
 
     html.Div(id='prediction-title', style={'textAlign': 'center'}),
 
+    dcc.Interval(
+        id='interval-component',
+        interval=60*1000,  # 1 minute interval
+        n_intervals=0
+    ),
+
     dcc.Graph(id='sensor-graph', style={'height': '80vh'})
 ])
 
 @app.callback(
     [Output('prediction-title', 'children'),
      Output('sensor-graph', 'figure')],
-    [Input('sensor-dropdown', 'value')]
+    [Input('sensor-dropdown', 'value'),
+     Input('interval-component', 'n_intervals')]
 )
-def update_graph(selected_feature):
-    # Get actual data from ThingSpeak
-    actual_url = f"https://api.thingspeak.com/channels/{THINGSPEAK_CHANNEL_ID}/fields/{THINGSPEAK_FIELDS[selected_feature]}.json?api_key={THINGSPEAK_API_KEY}&results=100"
-    response = requests.get(actual_url).json()
+def update_graph(selected_feature, n):
+    actual_times, actual_values = fetch_actual_data(selected_feature)
+    predicted_time, predicted_values = fetch_predicted_data(selected_feature)
 
-    actual_times = [entry["created_at"] for entry in response["feeds"] if entry.get(f"field{THINGSPEAK_FIELDS[selected_feature]}")]
-    actual_values = [float(entry[f"field{THINGSPEAK_FIELDS[selected_feature]}"]) for entry in response["feeds"] if entry.get(f"field{THINGSPEAK_FIELDS[selected_feature]}")]
+    if not actual_times or not predicted_time.any():
+        return "Error loading data", {}
 
-    try:
-        # Use requests to fetch the CSV from Google Drive
-        file_url = PREDICTED_FILES[selected_feature]
-        file_response = requests.get(file_url)
-        file_response.raise_for_status()
-
-        # Load CSV using pandas
-        predicted_df = pd.read_csv(io.StringIO(file_response.text))
-        predicted_df['Time'] = pd.to_datetime(predicted_df['Time'])
-        predicted_time = predicted_df['Time']
-        predicted_values = predicted_df['Predicted Value']
-    except Exception as e:
-        print(f"Failed to load predicted CSV: {e}")
-        return "Error loading predicted data", {}
-
-    # Create graph
     fig = go.Figure()
 
     fig.add_trace(go.Scatter(
@@ -102,11 +117,11 @@ def update_graph(selected_feature):
         title=f"Sensor vs AI Prediction: {SENSOR_LABELS[selected_feature]}",
         xaxis_title="Time",
         yaxis_title=SENSOR_LABELS[selected_feature],
-        template="plotly_white",  # Light theme
+        template="plotly_white",
         yaxis=dict(range=[y_min, y_max]),
-        plot_bgcolor='white',      # Chart area background
-        paper_bgcolor='white',     # Outside chart area
-        font=dict(color='black')   # Font color for visibility
+        plot_bgcolor='white',
+        paper_bgcolor='white',
+        font=dict(color='black')
     )
 
     return f"{SENSOR_LABELS[selected_feature]} - Actual vs Predicted", fig
