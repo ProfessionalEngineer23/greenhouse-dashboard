@@ -20,10 +20,10 @@ THINGSPEAK_FIELDS = {
 
 # Public Google Drive links to CSV files for AI-predicted data
 PREDICTED_FILES = {
-    'Soil_Temperature': "https://drive.google.com/uc?export=download&id=1-A3_3DvK0eVOotIlZq5jyEl-lM0AWn27",
+    'Soil_Temperature': "https://drive.google.com/uc?export=download&id=1ftGCeMkhkb4-Rcvj8tsoXAq254kNDUoM",
     'Air_Temperature': "https://drive.google.com/uc?export=download&id=1-bNzPoA-2VWE1vpka4vy4vUXxI17MqPb",
     'Humidity': "https://drive.google.com/uc?export=download&id=1-U0-uaAyyoRo4gVM-tzyFypL1nNtINKQ",
-    'Light_Intensity': "https://drive.google.com/uc?export=download&id=1-6yBJmU4Iz2wfwg_opJdKgQVu4tLEALb"
+    'Light_Intensity': "https://drive.google.com/uc?export=download&id=1-A3_3DvK0eVOotIlZq5jyEl-lM0AWn27"
 }
 
 # Display labels for each sensor
