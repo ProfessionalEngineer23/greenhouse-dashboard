@@ -6,11 +6,11 @@ import plotly.graph_objects as go
 import requests
 import io
 
-# ThingSpeak API configuration
+# ThingSpeak Config
 THINGSPEAK_CHANNEL_ID = "2867238"
 THINGSPEAK_API_KEY = "8VBQT42DSZ7SSCV3"
 
-# Mapping sensor names to their ThingSpeak field numbers
+# Mapping fields
 THINGSPEAK_FIELDS = {
     'Soil_Temperature': 1,
     'Air_Temperature': 2,
@@ -18,7 +18,6 @@ THINGSPEAK_FIELDS = {
     'Light_Intensity': 4
 }
 
-# Public Google Drive links to CSV files for AI-predicted data
 PREDICTED_FILES = {
     'Soil_Temperature': "https://drive.google.com/uc?export=download&id=1-A3_3DvK0eVOotIlZq5jyEl-lM0AWn27",
     'Air_Temperature': "https://drive.google.com/uc?export=download&id=1-bNzPoA-2VWE1vpka4vy4vUXxI17MqPb",
@@ -26,7 +25,6 @@ PREDICTED_FILES = {
     'Light_Intensity': "https://drive.google.com/uc?export=download&id=1-6yBJmU4Iz2wfwg_opJdKgQVu4tLEALb"
 }
 
-# Display labels for each sensor
 SENSOR_LABELS = {
     'Soil_Temperature': "Soil Temperature (°C)",
     'Air_Temperature': "Air Temperature (°C)",
@@ -34,26 +32,22 @@ SENSOR_LABELS = {
     'Light_Intensity': "Light Intensity (lux)"
 }
 
-# Initialize Dash app and server
+# App init
 app = dash.Dash(__name__)
 server = app.server
 
-# Layout
 app.layout = html.Div(style={'backgroundColor': 'white', 'color': 'black', 'padding': '10px'}, children=[
     html.H1("Greenhouse AI & Sensor Dashboard", style={'textAlign': 'center'}),
-
     dcc.Dropdown(
         id='sensor-dropdown',
         options=[{'label': label, 'value': key} for key, label in SENSOR_LABELS.items()],
         value='Air_Temperature',
         style={'width': '50%', 'margin': 'auto'}
     ),
-
     html.Div(id='prediction-title', style={'textAlign': 'center'}),
     dcc.Graph(id='sensor-graph', style={'height': '80vh'})
 ])
 
-# CALLBACK SHOULD GO BELOW THIS LINE!
 @app.callback(
     [Output('prediction-title', 'children'),
      Output('sensor-graph', 'figure')],
@@ -76,9 +70,11 @@ def update_graph(selected_feature):
         predicted_times = predicted_df['Time'].tolist()
         predicted_values = predicted_df['Predicted Value'].tolist()
 
+        # Smooth connection from actual to predicted
         if actual_times and actual_values:
             predicted_times.insert(0, pd.to_datetime(actual_times[-1]))
             predicted_values.insert(0, actual_values[-1])
+
     except Exception as e:
         print(f"❌ Error loading predicted CSV: {e}")
         return "Error loading predicted data", {}
@@ -130,6 +126,5 @@ def update_graph(selected_feature):
 
     return f"{SENSOR_LABELS[selected_feature]} - Actual vs Predicted", fig
 
-# Entry point
 if __name__ == '__main__':
     app.run_server(debug=True, host='0.0.0.0', port=10000)
