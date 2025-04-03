@@ -1,7 +1,9 @@
+dash==2.16.1
 pandas
 numpy
 schedule
 matplotlib
 scikit-learn
+plotly
+requests
 gunicorn
-
