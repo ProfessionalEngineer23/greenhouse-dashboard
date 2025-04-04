@@ -10,7 +10,6 @@ import io
 THINGSPEAK_CHANNEL_ID = "2867238"
 THINGSPEAK_API_KEY = "8VBQT42DSZ7SSCV3"
 
-# Mapping fields
 THINGSPEAK_FIELDS = {
     'Soil_Temperature': 1,
     'Air_Temperature': 2,
@@ -32,7 +31,6 @@ SENSOR_LABELS = {
     'Light_Intensity': "Light Intensity (lux)"
 }
 
-# App init
 app = dash.Dash(__name__)
 server = app.server
 
@@ -66,7 +64,7 @@ def update_graph(selected_feature, n_intervals):
     actual_url = f"https://api.thingspeak.com/channels/{THINGSPEAK_CHANNEL_ID}/fields/{THINGSPEAK_FIELDS[selected_feature]}.json?api_key={THINGSPEAK_API_KEY}&results=100"
     response = requests.get(actual_url).json()
 
-    actual_times = [entry["created_at"] for entry in response["feeds"] if entry.get(f"field{THINGSPEAK_FIELDS[selected_feature]}")]
+    actual_times = [pd.to_datetime(entry["created_at"]) for entry in response["feeds"] if entry.get(f"field{THINGSPEAK_FIELDS[selected_feature]}")]
     actual_values = [float(entry[f"field{THINGSPEAK_FIELDS[selected_feature]}"]) for entry in response["feeds"] if entry.get(f"field{THINGSPEAK_FIELDS[selected_feature]}")]
 
     try:
@@ -79,11 +77,7 @@ def update_graph(selected_feature, n_intervals):
         predicted_times = predicted_df['Time'].tolist()
         predicted_values = predicted_df['Predicted Value'].tolist()
 
-        # Add most recent actual as the starting point of prediction
-        if actual_times and actual_values:
-            predicted_times.insert(0, pd.to_datetime(actual_times[-1]))
-            predicted_values.insert(0, actual_values[-1])
-
+        # ⚠️ Do not insert the current time point — keep real future predictions separate!
     except Exception as e:
         print(f"❌ Error loading predicted CSV: {e}")
         return "Error loading predicted data", {}
@@ -95,7 +89,8 @@ def update_graph(selected_feature, n_intervals):
         y=actual_values,
         mode='lines+markers',
         name="Actual Data",
-        line=dict(color='blue')
+        line=dict(color='blue'),
+        hovertemplate='Time: %{x}<br>Value: %{y}<br><b>Type: Actual</b><extra></extra>'
     ))
 
     fig.add_trace(go.Scatter(
@@ -103,11 +98,13 @@ def update_graph(selected_feature, n_intervals):
         y=predicted_values,
         mode='lines+markers',
         name="Predicted Future",
-        line=dict(color='red', dash='dash')
+        line=dict(color='red', dash='dash'),
+        hovertemplate='Time: %{x}<br>Value: %{y}<br><b>Type: Predicted</b><extra></extra>'
     ))
 
-    if actual_times:
-        divider_time = pd.to_datetime(actual_times[-1])
+    # Divider line
+    if actual_times and predicted_times:
+        divider_time = predicted_times[0]
         fig.add_shape(
             type="line",
             x0=divider_time,
