@@ -49,10 +49,9 @@ app.layout = html.Div(style={'backgroundColor': 'white', 'color': 'black', 'padd
     html.Div(id='prediction-title', style={'textAlign': 'center'}),
     dcc.Graph(id='sensor-graph', style={'height': '80vh'}),
 
-    # 👇 Auto-refresh every 60 seconds
     dcc.Interval(
         id='interval-component',
-        interval=60 * 1000,  # in milliseconds
+        interval=60 * 1000,
         n_intervals=0
     )
 ])
@@ -61,7 +60,7 @@ app.layout = html.Div(style={'backgroundColor': 'white', 'color': 'black', 'padd
     [Output('prediction-title', 'children'),
      Output('sensor-graph', 'figure')],
     [Input('sensor-dropdown', 'value'),
-     Input('interval-component', 'n_intervals')]  # 👈 triggers every 60 seconds
+     Input('interval-component', 'n_intervals')]
 )
 def update_graph(selected_feature, n_intervals):
     actual_url = f"https://api.thingspeak.com/channels/{THINGSPEAK_CHANNEL_ID}/fields/{THINGSPEAK_FIELDS[selected_feature]}.json?api_key={THINGSPEAK_API_KEY}&results=100"
@@ -80,6 +79,7 @@ def update_graph(selected_feature, n_intervals):
         predicted_times = predicted_df['Time'].tolist()
         predicted_values = predicted_df['Predicted Value'].tolist()
 
+        # Add most recent actual as the starting point of prediction
         if actual_times and actual_values:
             predicted_times.insert(0, pd.to_datetime(actual_times[-1]))
             predicted_values.insert(0, actual_values[-1])
@@ -95,8 +95,7 @@ def update_graph(selected_feature, n_intervals):
         y=actual_values,
         mode='lines+markers',
         name="Actual Data",
-        line=dict(color='blue'),
-        hovertemplate='Time: %{x}<br>Value: %{y}<br><b>Type: Actual</b><extra></extra>'
+        line=dict(color='blue')
     ))
 
     fig.add_trace(go.Scatter(
@@ -104,8 +103,7 @@ def update_graph(selected_feature, n_intervals):
         y=predicted_values,
         mode='lines+markers',
         name="Predicted Future",
-        line=dict(color='red', dash='dash'),
-        hovertemplate='Time: %{x}<br>Value: %{y}<br><b>Type: Predicted</b><extra></extra>'
+        line=dict(color='red', dash='dash')
     ))
 
     if actual_times:
