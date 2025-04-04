@@ -64,7 +64,7 @@ def update_graph(selected_feature, n_intervals):
     actual_url = f"https://api.thingspeak.com/channels/{THINGSPEAK_CHANNEL_ID}/fields/{THINGSPEAK_FIELDS[selected_feature]}.json?api_key={THINGSPEAK_API_KEY}&results=100"
     response = requests.get(actual_url).json()
 
-    actual_times = [pd.to_datetime(entry["created_at"]) for entry in response["feeds"] if entry.get(f"field{THINGSPEAK_FIELDS[selected_feature]}")]
+    actual_times = [pd.to_datetime(entry["created_at"]).tz_localize(None) for entry in response["feeds"] if entry.get(f"field{THINGSPEAK_FIELDS[selected_feature]}")]
     actual_values = [float(entry[f"field{THINGSPEAK_FIELDS[selected_feature]}"]) for entry in response["feeds"] if entry.get(f"field{THINGSPEAK_FIELDS[selected_feature]}")]
 
     try:
@@ -73,11 +73,11 @@ def update_graph(selected_feature, n_intervals):
         file_response.raise_for_status()
         predicted_df = pd.read_csv(io.StringIO(file_response.text))
         predicted_df['Time'] = pd.to_datetime(predicted_df['Time'])
+        predicted_df['Time'] = predicted_df['Time'].dt.tz_localize(None)
 
         predicted_times = predicted_df['Time'].tolist()
         predicted_values = predicted_df['Predicted Value'].tolist()
 
-        # ⚠️ Do not insert the current time point — keep real future predictions separate!
     except Exception as e:
         print(f"❌ Error loading predicted CSV: {e}")
         return "Error loading predicted data", {}
@@ -102,7 +102,6 @@ def update_graph(selected_feature, n_intervals):
         hovertemplate='Time: %{x}<br>Value: %{y}<br><b>Type: Predicted</b><extra></extra>'
     ))
 
-    # Divider line
     if actual_times and predicted_times:
         divider_time = predicted_times[0]
         fig.add_shape(
@@ -114,6 +113,10 @@ def update_graph(selected_feature, n_intervals):
             line=dict(color="gray", dash="dot", width=1)
         )
 
+    x_min = min(actual_times + predicted_times)
+    x_max = max(actual_times + predicted_times)
+    default_range_start = x_max - pd.Timedelta(hours=1)
+
     fig.update_layout(
         title=f"Sensor vs AI Prediction: {SENSOR_LABELS[selected_feature]}",
         xaxis_title="Time",
@@ -123,6 +126,12 @@ def update_graph(selected_feature, n_intervals):
             min(actual_values + predicted_values) * 0.9,
             max(actual_values + predicted_values) * 1.1
         ]),
+        xaxis=dict(
+            tickformat="%b %d\n%H:%M",
+            showgrid=True,
+            rangeslider_visible=True,
+            range=[default_range_start, x_max]
+        ),
         plot_bgcolor='white',
         paper_bgcolor='white',
         font=dict(color='black')
