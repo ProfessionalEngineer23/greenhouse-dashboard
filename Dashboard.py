@@ -10,18 +10,19 @@ import io
 THINGSPEAK_CHANNEL_ID = "2867238"
 THINGSPEAK_API_KEY = "8VBQT42DSZ7SSCV3"
 
+# 🔁 Swapped Light and Soil field mappings
 THINGSPEAK_FIELDS = {
-    'Soil_Temperature': 1,
+    'Light_Intensity': 1,      # was Soil_Temperature
     'Air_Temperature': 2,
     'Humidity': 3,
-    'Light_Intensity': 4
+    'Soil_Temperature': 4      # was Light_Intensity
 }
 
 PREDICTED_FILES = {
-    'Soil_Temperature': "https://drive.google.com/uc?export=download&id=1-A3_3DvK0eVOotIlZq5jyEl-lM0AWn27",
+    'Soil_Temperature': "https://drive.google.com/uc?export=download&id=1-6yBJmU4Iz2wfwg_opJdKgQVu4tLEALb",  # was Light
     'Air_Temperature': "https://drive.google.com/uc?export=download&id=1-bNzPoA-2VWE1vpka4vy4vUXxI17MqPb",
     'Humidity': "https://drive.google.com/uc?export=download&id=1-U0-uaAyyoRo4gVM-tzyFypL1nNtINKQ",
-    'Light_Intensity': "https://drive.google.com/uc?export=download&id=1-6yBJmU4Iz2wfwg_opJdKgQVu4tLEALb"
+    'Light_Intensity': "https://drive.google.com/uc?export=download&id=1-A3_3DvK0eVOotIlZq5jyEl-lM0AWn27"   # was Soil
 }
 
 SENSOR_LABELS = {
