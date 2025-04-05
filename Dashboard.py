@@ -18,12 +18,12 @@ THINGSPEAK_FIELDS = {
     'Light_Intensity': 4
 }
 
-# ✅ Corrected predicted file mapping
+# ✅ Corrected predicted file mapping (swapped correctly)
 PREDICTED_FILES = {
-    'Soil_Temperature': "https://drive.google.com/uc?export=download&id=1-A3_3DvK0eVOotIlZq5jyEl-lM0AWn27",
+    'Soil_Temperature': "https://drive.google.com/uc?export=download&id=1-6yBJmU4Iz2wfwg_opJdKgQVu4tLEALb",
     'Air_Temperature': "https://drive.google.com/uc?export=download&id=1-bNzPoA-2VWE1vpka4vy4vUXxI17MqPb",
     'Humidity': "https://drive.google.com/uc?export=download&id=1-U0-uaAyyoRo4gVM-tzyFypL1nNtINKQ",
-    'Light_Intensity': "https://drive.google.com/uc?export=download&id=1-6yBJmU4Iz2wfwg_opJdKgQVu4tLEALb"
+    'Light_Intensity': "https://drive.google.com/uc?export=download&id=1-A3_3DvK0eVOotIlZq5jyEl-lM0AWn27"
 }
 
 SENSOR_LABELS = {
