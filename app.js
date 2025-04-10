@@ -30,10 +30,12 @@ async function updateChart() {
   const actualTimes = data.feeds.map(f => new Date(f.created_at));
   const actualValues = data.feeds.map(f => parseFloat(f[`field${fieldMap[sensor]}`]));
 
+  const latestValue = actualValues[actualValues.length - 1];
+  checkForAlerts(sensor, latestValue);
+
   const predCsv = await fetch(predictedFiles[sensor]).then(r => r.text());
   const predLines = predCsv.split("\n").slice(1);
-  const predTimes = [];
-  const predValues = [];
+  const predTimes = [], predValues = [];
 
   for (let line of predLines) {
     if (!line.trim()) continue;
@@ -74,8 +76,20 @@ function drawChart(label, x1, y1, x2, y2) {
       responsive: true,
       scales: {
         x: { type: "time", time: { tooltipFormat: "MMM d, HH:mm" } },
-        y: { beginAtZero: true },
+        y: { beginAtZero: false },
       },
     },
   });
+}
+
+function checkForAlerts(sensor, value) {
+  if (sensor === "Air_Temperature") {
+    if (value > 35) alert("⚠️ Air Temperature is too high!");
+    else if (value < 10) alert("⚠️ Air Temperature is too low!");
+  } else if (sensor === "Soil_Temperature") {
+    if (value > 35) alert("⚠️ Soil Temperature is too high!");
+    else if (value < 10) alert("⚠️ Soil Temperature is too low!");
+  } else if (sensor === "Light_Intensity") {
+    if (value > 900) alert("⚠️ Light Intensity is too high!");
+  }
 }
