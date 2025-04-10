@@ -1,0 +1,22 @@
+body {
+  background: #f8f8f8;
+  color: #222;
+  font-family: Arial, sans-serif;
+  text-align: center;
+  padding: 20px;
+}
+
+h1 {
+  margin-bottom: 20px;
+}
+
+select {
+  padding: 10px;
+  margin-bottom: 20px;
+  font-size: 16px;
+}
+
+canvas {
+  max-width: 90%;
+  height: 400px;
+}
