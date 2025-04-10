@@ -4,21 +4,26 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Greenhouse Dashboard</title>
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
-  <h1>Greenhouse AI & Sensor Dashboard</h1>
+  <div style="text-align: center; padding: 20px;">
+    <h1>Greenhouse AI & Sensor Dashboard</h1>
 
-  <select id="sensorDropdown">
-    <option value="Soil_Temperature">Soil Temperature (°C)</option>
-    <option value="Air_Temperature" selected>Air Temperature (°C)</option>
-    <option value="Humidity">Humidity (%)</option>
-    <option value="Light_Intensity">Light Intensity (lux)</option>
-  </select>
+    <select id="sensorDropdown" style="padding: 5px 10px; margin-bottom: 20px;">
+      <option value="Soil_Temperature">Soil Temperature (°C)</option>
+      <option value="Air_Temperature" selected>Air Temperature (°C)</option>
+      <option value="Humidity">Humidity (%)</option>
+      <option value="Light_Intensity">Light Intensity (lux)</option>
+    </select>
 
-  <canvas id="sensorChart" height="120"></canvas>
+    <div style="max-width: 900px; margin: 0 auto;">
+      <canvas id="sensorChart" height="400"></canvas>
+    </div>
+  </div>
 
+  <script src="notifications.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
