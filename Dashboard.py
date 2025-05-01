@@ -5,10 +5,15 @@ import pandas as pd
 import plotly.graph_objects as go
 import requests
 import io
+import os
+from dotenv import load_dotenv
+
+# Load .env variables
+load_dotenv()
 
 # ThingSpeak Config
-THINGSPEAK_CHANNEL_ID = "2867238"
-THINGSPEAK_API_KEY = "8VBQT42DSZ7SSCV3"
+THINGSPEAK_CHANNEL_ID = os.getenv("THINGSPEAK_CHANNEL_ID")
+THINGSPEAK_API_KEY = os.getenv("THINGSPEAK_API_KEY")
 
 # ✅ Updated mappings including Fan
 THINGSPEAK_FIELDS = {
