@@ -9,14 +9,13 @@ import os
 from dotenv import load_dotenv
 import pytz
 
-# Load .env variables
+# Load environment variables
 load_dotenv()
 
 # ThingSpeak Config
 THINGSPEAK_CHANNEL_ID = os.getenv("THINGSPEAK_CHANNEL_ID")
 THINGSPEAK_API_KEY = os.getenv("THINGSPEAK_API_KEY")
 
-# ✅ Updated mappings including Fan
 THINGSPEAK_FIELDS = {
     'Soil_Temperature': 1,
     'Air_Temperature': 2,
@@ -25,7 +24,6 @@ THINGSPEAK_FIELDS = {
     'Fan': 5
 }
 
-# ✅ Updated predicted file mapping
 PREDICTED_FILES = {
     'Soil_Temperature': "https://drive.google.com/uc?export=download&id=1-6yBJmU4Iz2wfwg_opJdKgQVu4tLEALb",
     'Air_Temperature': "https://drive.google.com/uc?export=download&id=1-bNzPoA-2VWE1vpka4vy4vUXxI17MqPb",
@@ -59,7 +57,7 @@ app.layout = html.Div(style={'backgroundColor': 'white', 'color': 'black', 'padd
 
     dcc.Interval(
         id='interval-component',
-        interval=30 * 1000,  # More frequent updates
+        interval=30 * 1000,  # every 30 seconds
         n_intervals=0
     )
 ])
@@ -71,20 +69,21 @@ app.layout = html.Div(style={'backgroundColor': 'white', 'color': 'black', 'padd
      Input('interval-component', 'n_intervals')]
 )
 def update_graph(selected_feature, n_intervals):
+    if selected_feature is None or selected_feature not in THINGSPEAK_FIELDS:
+        return "Please select a valid sensor.", go.Figure()
+
     field_id = THINGSPEAK_FIELDS[selected_feature]
     actual_url = f"https://api.thingspeak.com/channels/{THINGSPEAK_CHANNEL_ID}/fields/{field_id}.json?api_key={THINGSPEAK_API_KEY}&results=20"
-    response = requests.get(actual_url).json()
 
     try:
+        response = requests.get(actual_url).json()
         utc_times = [pd.to_datetime(entry["created_at"]).tz_convert('UTC')
                      for entry in response["feeds"] if entry.get(f"field{field_id}")]
         actual_times = [time.tz_convert('Europe/Dublin').tz_localize(None) for time in utc_times]
+        actual_values = [float(entry[f"field{field_id}"])
+                         for entry in response["feeds"] if entry.get(f"field{field_id}")]
     except Exception as e:
-        print("❌ Timestamp parsing failed:", e)
-        actual_times = []
-
-    actual_values = [float(entry[f"field{field_id}"])
-                     for entry in response["feeds"] if entry.get(f"field{field_id}")]
+        return f"Error loading ThingSpeak data: {e}", go.Figure()
 
     fig = go.Figure()
 
@@ -142,7 +141,7 @@ def update_graph(selected_feature, n_intervals):
         font=dict(color='black')
     )
 
-    return f"{SENSOR_LABELS[selected_feature]}", fig
+    return SENSOR_LABELS[selected_feature], fig
 
 if __name__ == '__main__':
     app.run_server(debug=True, host='0.0.0.0', port=10000)
