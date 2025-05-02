@@ -123,7 +123,7 @@ def update_graph(selected_feature, n_intervals):
             )
 
         except Exception as e:
-            print(f"❌ Error loading predicted CSV: {e}")
+            print(f"Error loading predicted CSV: {e}")
 
     yaxis_title = SENSOR_LABELS[selected_feature]
     y_min = min(actual_values) - 1 if selected_feature == 'Fan' else min(actual_values) * 0.9
