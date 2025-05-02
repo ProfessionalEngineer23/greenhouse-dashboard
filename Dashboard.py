@@ -28,7 +28,7 @@ PREDICTED_FILES = {
     'Soil_Temperature': "https://drive.google.com/uc?export=download&id=1-6yBJmU4Iz2wfwg_opJdKgQVu4tLEALb",
     'Air_Temperature': "https://drive.google.com/uc?export=download&id=1-bNzPoA-2VWE1vpka4vy4vUXxI17MqPb",
     'Humidity': "https://drive.google.com/uc?export=download&id=1-U0-uaAyyoRo4gVM-tzyFypL1nNtINKQ",
-    'Light_Intensity': "https://drive.google.com/uc?export=download&id=1IT5FuSIzCvgT3GXVkapR3RG631D5c3Z8"
+    'Light_Intensity': "https://drive.google.com/uc?export=download&id=1-A3_3DvK0eVOotIlZq5jyEl-lM0AWn27"
 }
 
 SENSOR_LABELS = {
@@ -102,14 +102,6 @@ def update_graph(selected_feature, n_intervals):
             file_response = requests.get(file_url)
             file_response.raise_for_status()
             predicted_df = pd.read_csv(io.StringIO(file_response.text))
-
-            print("Predicted CSV loaded:")
-            print(predicted_df.head())
-            print(predicted_df.dtypes)
-
-            if 'Time' not in predicted_df.columns or 'Predicted Value' not in predicted_df.columns:
-                raise ValueError("Missing 'Time' or 'Predicted Value' in predicted data")
-
             predicted_df['Time'] = pd.to_datetime(predicted_df['Time']).dt.tz_localize(None)
 
             fig.add_trace(go.Scatter(
