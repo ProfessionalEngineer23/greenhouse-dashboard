@@ -101,29 +101,41 @@ def update_graph(selected_feature, n_intervals):
             file_url = PREDICTED_FILES[selected_feature]
             file_response = requests.get(file_url)
             file_response.raise_for_status()
+
             predicted_df = pd.read_csv(io.StringIO(file_response.text))
-            predicted_df['Time'] = pd.to_datetime(predicted_df['Time']).dt.tz_localize(None)
+
+            # Clean column names and ensure proper time parsing
+            predicted_df.columns = predicted_df.columns.str.strip()
+            if 'Time' not in predicted_df.columns or predicted_df.shape[1] < 2:
+                raise ValueError("CSV must contain 'Time' and at least one prediction column")
+
+            predicted_df['Time'] = pd.to_datetime(predicted_df['Time'], errors='coerce')
+            predicted_df = predicted_df.dropna(subset=['Time'])
+
+            # Log column names for debugging
+            print("Predicted Columns:", predicted_df.columns)
 
             fig.add_trace(go.Scatter(
                 x=predicted_df['Time'],
-                y=predicted_df['Predicted Value'],
+                y=predicted_df.iloc[:, 1],  # Use second column regardless of name
                 mode='lines+markers',
                 name="Predicted Future",
                 line=dict(color='red', dash='dash'),
                 hovertemplate='Time: %{x}<br>Value: %{y}<br><b>Type: Predicted</b><extra></extra>'
             ))
 
+            # Add vertical line to indicate prediction start
             fig.add_shape(
                 type="line",
                 x0=predicted_df['Time'].iloc[0],
-                y0=min(actual_values + predicted_df['Predicted Value'].tolist()) * 0.9,
+                y0=min(actual_values + predicted_df.iloc[:, 1].tolist()) * 0.9,
                 x1=predicted_df['Time'].iloc[0],
-                y1=max(actual_values + predicted_df['Predicted Value'].tolist()) * 1.1,
+                y1=max(actual_values + predicted_df.iloc[:, 1].tolist()) * 1.1,
                 line=dict(color="gray", dash="dot", width=1)
             )
 
         except Exception as e:
-            print(f"Error loading predicted CSV: {e}")
+            print(f"Error loading predicted CSV for {selected_feature}: {e}")
 
     yaxis_title = SENSOR_LABELS[selected_feature]
     y_min = min(actual_values) - 1 if selected_feature == 'Fan' else min(actual_values) * 0.9
