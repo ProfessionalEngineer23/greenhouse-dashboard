@@ -73,7 +73,7 @@ def update_graph(selected_feature, n_intervals):
         return "Please select a valid sensor.", go.Figure()
 
     field_id = THINGSPEAK_FIELDS[selected_feature]
-    actual_url = f"https://api.thingspeak.com/channels/{THINGSPEAK_CHANNEL_ID}/fields/{field_id}.json?api_key={THINGSPEAK_API_KEY}&results=20"
+    actual_url = f"https://api.thingspeak.com/channels/{THINGSPEAK_CHANNEL_ID}/fields/{field_id}.json?api_key={THINGSPEAK_API_KEY}&results=50"
 
     try:
         response = requests.get(actual_url).json()
@@ -104,6 +104,11 @@ def update_graph(selected_feature, n_intervals):
             predicted_df = pd.read_csv(io.StringIO(file_response.text))
             predicted_df['Time'] = pd.to_datetime(predicted_df['Time']).dt.tz_localize(None)
 
+            # Filter out predictions older than last actual value
+            if actual_times:
+                last_actual_time = max(actual_times)
+                predicted_df = predicted_df[predicted_df['Time'] > last_actual_time]
+
             fig.add_trace(go.Scatter(
                 x=predicted_df['Time'],
                 y=predicted_df['Predicted Value'],
@@ -113,14 +118,16 @@ def update_graph(selected_feature, n_intervals):
                 hovertemplate='Time: %{x}<br>Value: %{y}<br><b>Type: Predicted</b><extra></extra>'
             ))
 
-            fig.add_shape(
-                type="line",
-                x0=predicted_df['Time'].iloc[0],
-                y0=min(actual_values + predicted_df['Predicted Value'].tolist()) * 0.9,
-                x1=predicted_df['Time'].iloc[0],
-                y1=max(actual_values + predicted_df['Predicted Value'].tolist()) * 1.1,
-                line=dict(color="gray", dash="dot", width=1)
-            )
+            # Draw a dotted vertical line to show where prediction starts
+            if not predicted_df.empty:
+                fig.add_shape(
+                    type="line",
+                    x0=predicted_df['Time'].iloc[0],
+                    y0=min(actual_values + predicted_df['Predicted Value'].tolist()) * 0.9,
+                    x1=predicted_df['Time'].iloc[0],
+                    y1=max(actual_values + predicted_df['Predicted Value'].tolist()) * 1.1,
+                    line=dict(color="gray", dash="dot", width=1)
+                )
 
         except Exception as e:
             print(f"Error loading predicted CSV: {e}")
